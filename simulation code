@@ -125,7 +125,7 @@ print(pd.DataFrame(summary_data).to_string(index=False))
 # --- PHASE 2: VISUALIZATION ---
 plt.figure(figsize=(10, 6))
 plt.bar(['Baseline (Siloed)', 'Proposed (Hybrid)'], [cost_sub_b, cost_sub_h], color=['#7f8c8d', '#27ae60'])
-plt.title('Economic Efficiency: Yearly Cost per Subscriber')
+plt.title('Economic Efficiency: Yearly Cost per Subscriber (TCO Floor)')
 plt.ylabel('USD ($)')
 plt.grid(axis='y', alpha=0.3)
 plt.show()
