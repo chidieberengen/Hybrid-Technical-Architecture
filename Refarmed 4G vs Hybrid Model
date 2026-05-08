@@ -1,0 +1,131 @@
+import numpy as np
+import pandas as pd
+from scipy import stats
+import matplotlib.pyplot as plt
+
+# ==========================================
+# 1. PARAMETERS & SOURCES
+# ==========================================
+N_ITERATIONS = 100000
+POPULATION = 200000
+LGA_AREA = 500
+LGA_RADIUS = np.sqrt(LGA_AREA / np.pi)
+RSRP_THRESHOLD = -95
+RANDOM_SEED = 42
+
+TECH_CONFIG = {
+    'baseline': {'f': 800, 'p_tx': 43, 'gain': 6,  'sites': 8, 'h_bs': 30, 'bw': 10},
+    'hybrid':   {'f': 800,  'p_tx': 46, 'gain': 15, 'sites': 2, 'h_bs': 35, 'bw': 20}
+}
+
+ECON_CONFIG = {
+    'base_capex_site': 145000,
+    'hyb_capex_site': 315000,
+    'base_opex_site': 25000,
+    'hyb_opex_site': 38500,
+    'mnos': 4,
+    'edge_cache_gain': 0.30,      # 30% latency reduction
+    'community_maint_gain': 0.30  # 30% OPEX reduction
+}
+
+# ==========================================
+# 2. ENGINES
+# ==========================================
+def extended_hata_pl(d, f, h_bs, h_ut=1.5):
+    log_f = np.log10(f)
+    a_h = (1.1 * log_f - 0.7) * h_ut - (1.56 * log_f - 0.8)
+    pl = 69.55 + 26.16*log_f - 13.82*np.log10(h_bs) - a_h + (44.9 - 6.55*np.log10(h_bs))*np.log10(d)
+    if d > 20: pl += 0.1 * (d - 20)
+    return pl
+
+def calculate_calculated_radius(cfg):
+    distances = np.linspace(0.1, 50, 1000)
+    for d in distances:
+        if (cfg['p_tx'] + cfg['gain'] - extended_hata_pl(d, cfg['f'], cfg['h_bs'])) < RSRP_THRESHOLD:
+            return d
+    return 50.0
+
+# ==========================================
+# 3. MONTE CARLO SIMULATION
+# ==========================================
+def run_simulation():
+    np.random.seed(RANDOM_SEED)
+    results_b, results_h = [], []
+
+    for _ in range(N_ITERATIONS):
+        dist = np.random.uniform(0.1, LGA_RADIUS)
+        shadow = np.random.normal(0, 6.0)
+
+        # Baseline RSRP
+        d_b = dist / np.sqrt(TECH_CONFIG['baseline']['sites'])
+        rsrp_b = 43 + 6 - extended_hata_pl(d_b, 2100, 30) - shadow
+
+        # Hybrid RSRP
+        d_h = dist / np.sqrt(TECH_CONFIG['hybrid']['sites'])
+        rsrp_h = 46 + 15 - extended_hata_pl(d_h, 800, 35) - shadow
+
+        # Metrics with Backhaul/Edge Caching Logic
+        thr_b = 10 * np.random.uniform(1.5, 2.0) if rsrp_b > RSRP_THRESHOLD else 0
+        thr_h = 20 * np.random.uniform(3.0, 4.5) if rsrp_h > RSRP_THRESHOLD else 0
+
+        lat_b = np.random.normal(40, 5) if thr_b > 0 else 0
+        # Apply 30% Edge Caching Gain to Hybrid Latency
+        lat_h = (np.random.normal(18, 2) * (1 - ECON_CONFIG['edge_cache_gain'])) if thr_h > 0 else 0
+
+        results_b.append({'thr': thr_b, 'lat': lat_b, 'covered': int(thr_b > 0)})
+        results_h.append({'thr': thr_h, 'lat': lat_h, 'covered': int(thr_h > 0)})
+
+    return pd.DataFrame(results_b), pd.DataFrame(results_h)
+
+# ==========================================
+# 4. STATISTICAL ANALYSIS FUNCTION
+# ==========================================
+def calculate_phase_1_stats(b_data, h_data):
+    def stats_agg(d):
+        m = np.mean(d)
+        se = stats.sem(d)
+        ci = stats.t.interval(0.95, len(d)-1, loc=m, scale=se)
+        return [f"{m*100:.2f}%", f"{se:.6f}", f"({ci[0]*100:.2f}%, {ci[1]*100:.2f}%)"]
+
+    df = pd.DataFrame({
+        'Metric': ['Mean Penetration', 'Standard Error', '95% CI'],
+        'Baseline (Siloed)': stats_agg(b_data),
+        'Proposed (Hybrid)': stats_agg(h_data)
+    })
+    return df
+
+# ==========================================
+# 5. EXECUTION & RESULTS
+# ==========================================
+df_b, df_h = run_simulation()
+
+# Economic Calculation with Community Maintenance Logic
+eff_cap_mno_b = ECON_CONFIG['base_capex_site'] * 2
+eff_cap_mno_h = (ECON_CONFIG['hyb_capex_site'] / 4) * 2
+eff_op_mno_b = ECON_CONFIG['base_opex_site'] * 2
+# Apply Community Maintenance gain to Hybrid OPEX
+eff_op_mno_h = ((ECON_CONFIG['hyb_opex_site'] * (1 - ECON_CONFIG['community_maint_gain'])) / 4) * 2
+
+cost_sub_b = (eff_cap_mno_b + eff_op_mno_b) / (POPULATION / 4)
+cost_sub_h = (eff_cap_mno_h + eff_op_mno_h) / (POPULATION / 4)
+
+print("--- PHASE 1: STATISTICAL PENETRATION ANALYSIS ---")
+print(calculate_phase_1_stats(df_b['covered'], df_h['covered']).to_string(index=False))
+
+print("\n--- PHASE 1: TECHNICAL & ECONOMIC SUMMARY ---")
+summary_data = {
+    'KPI': ['Avg Throughput (Mbps)', 'Eff. Radius (km)', 'Avg Latency (ms)', 'Eff. CAPEX/MN0 ($)', 'Eff. OPEX/MNO ($)', 'Cost/Sub/Yr ($)'],
+    'Baseline': [f"{df_b['thr'].mean():.2f}", f"{calculate_calculated_radius(TECH_CONFIG['baseline']):.2f}",
+                  f"{df_b[df_b['lat']>0]['lat'].mean():.2f}", f"{eff_cap_mno_b:.2f}", f"{eff_op_mno_b:.2f}", f"{cost_sub_b:.2f}"],
+    'Hybrid': [f"{df_h['thr'].mean():.2f}", f"{calculate_calculated_radius(TECH_CONFIG['hybrid']):.2f}",
+                f"{df_h[df_h['lat']>0]['lat'].mean():.2f}", f"{eff_cap_mno_h:.2f}", f"{eff_op_mno_h:.2f}", f"{cost_sub_h:.2f}"]
+}
+print(pd.DataFrame(summary_data).to_string(index=False))
+
+# --- PHASE 2: VISUALIZATION ---
+plt.figure(figsize=(10, 6))
+plt.bar(['Baseline (Siloed)', 'Proposed (Hybrid)'], [cost_sub_b, cost_sub_h], color=['#7f8c8d', '#27ae60'])
+plt.title('Economic Efficiency: Yearly Cost per Subscriber (TCO Floor)')
+plt.ylabel('USD ($)')
+plt.grid(axis='y', alpha=0.3)
+plt.show()
