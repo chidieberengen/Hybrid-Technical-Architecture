@@ -41,7 +41,7 @@ def modified_hata_pl(d, f, h_bs, h_ut=1.5):
 def calculate_calculated_radius(cfg):
     distances = np.linspace(0.1, 50, 1000)
     for d in distances:
-        if (cfg['p_tx'] + cfg['gain'] - extended_hata_pl(d, cfg['f'], cfg['h_bs'])) < RSRP_THRESHOLD:
+        if (cfg['p_tx'] + cfg['gain'] - modified_hata_pl(d, cfg['f'], cfg['h_bs'])) < RSRP_THRESHOLD:
             return d
     return 50.0
 
@@ -58,11 +58,11 @@ def run_simulation():
 
         # Baseline RSRP
         d_b = dist / np.sqrt(TECH_CONFIG['baseline']['sites'])
-        rsrp_b = 43 + 6 - extended_hata_pl(d_b, 2100, 30) - shadow
+        rsrp_b = 43 + 6 - modified_hata_pl(d_b, 2100, 30) - shadow
 
         # Hybrid RSRP
         d_h = dist / np.sqrt(TECH_CONFIG['hybrid']['sites'])
-        rsrp_h = 46 + 15 - extended_hata_pl(d_h, 800, 35) - shadow
+        rsrp_h = 46 + 15 - modified_hata_pl(d_h, 800, 35) - shadow
 
         # Metrics with Backhaul/Edge Caching Logic
         thr_b = 10 * np.random.uniform(1.5, 2.0) if rsrp_b > RSRP_THRESHOLD else 0
