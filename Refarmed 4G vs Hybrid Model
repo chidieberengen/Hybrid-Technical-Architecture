@@ -31,7 +31,7 @@ ECON_CONFIG = {
 # ==========================================
 # 2. ENGINES
 # ==========================================
-def extended_hata_pl(d, f, h_bs, h_ut=1.5):
+def modified_hata_pl(d, f, h_bs, h_ut=1.5):
     log_f = np.log10(f)
     a_h = (1.1 * log_f - 0.7) * h_ut - (1.56 * log_f - 0.8)
     pl = 69.55 + 26.16*log_f - 13.82*np.log10(h_bs) - a_h + (44.9 - 6.55*np.log10(h_bs))*np.log10(d)
