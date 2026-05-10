@@ -31,17 +31,17 @@ ECON_CONFIG = {
 # ==========================================
 # 2. ENGINES
 # ==========================================
-def modified_hata_pl(d, f, h_bs, h_ut=1.5):
+def okumura_hata_pl(d, f, h_bs, h_ut=1.5):
     log_f = np.log10(f)
-    a_h = (1.1 * log_f - 0.7) * h_ut - (1.56 * log_f - 0.8)
-    pl = 69.55 + 26.16*log_f - 13.82*np.log10(h_bs) - a_h + (44.9 - 6.55*np.log10(h_bs))*np.log10(d)
-    if d > 20: pl += 0.1 * (d - 20)
+    a_h = 1.1 * (log_f - 0.7) * h_ut - (1.56 * log_f - 0.8)
+    pl = 69.61 + 26.21*log_f - 13.81*np.log10(h_bs) - a_h + (44.92 - 6.62*np.log10(h_bs))*np.log10(d)
+    
     return pl
 
 def calculate_calculated_radius(cfg):
     distances = np.linspace(0.1, 50, 1000)
     for d in distances:
-        if (cfg['p_tx'] + cfg['gain'] - modified_hata_pl(d, cfg['f'], cfg['h_bs'])) < RSRP_THRESHOLD:
+        if (cfg['p_tx'] + cfg['gain'] - okumura_hata_pl(d, cfg['f'], cfg['h_bs'])) < RSRP_THRESHOLD:
             return d
     return 50.0
 
@@ -58,11 +58,11 @@ def run_simulation():
 
         # Baseline RSRP
         d_b = dist / np.sqrt(TECH_CONFIG['baseline']['sites'])
-        rsrp_b = 43 + 6 - modified_hata_pl(d_b, 2100, 30) - shadow
+        rsrp_b = 43 + 6 - okumura_hata_pl(d_b, 2100, 30) - shadow
 
         # Hybrid RSRP
         d_h = dist / np.sqrt(TECH_CONFIG['hybrid']['sites'])
-        rsrp_h = 46 + 15 - modified_hata_pl(d_h, 800, 35) - shadow
+        rsrp_h = 46 + 15 - okumura_hata_pl(d_h, 800, 35) - shadow
 
         # Metrics with Backhaul/Edge Caching Logic
         thr_b = 10 * np.random.uniform(1.5, 2.0) if rsrp_b > RSRP_THRESHOLD else 0
