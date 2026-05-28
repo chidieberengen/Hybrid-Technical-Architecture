@@ -14,7 +14,7 @@ RSRP_THRESHOLD = -95
 RANDOM_SEED = 42
 
 TECH_CONFIG = {
-    'baseline': {'f': 800, 'p_tx': 43, 'gain': 6,  'sites': 8, 'h_bs': 30, 'bw': 10}, # Corrected baseline frequency to 2100MHz as used in the loop
+    'baseline': {'f': 800, 'p_tx': 43, 'gain': 6,  'sites': 8, 'h_bs': 30, 'bw': 10}, 
     'hybrid':   {'f': 800,  'p_tx': 46, 'gain': 15, 'sites': 2, 'h_bs': 35, 'bw': 20}
 }
 
